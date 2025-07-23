@@ -16,6 +16,7 @@ from pdf import DocumentLoaderPDF
 load_dotenv()
 
 PDF_DOC = "arimac-rag-doc.pdf"
+QUERY = "Who is the founder of Arimac Digital?"
 
 
 async def write_to_csv(data: list):
@@ -67,7 +68,9 @@ class TestCosmosDB(unittest.IsolatedAsyncioTestCase):
         texts = [page.content for page in pages if page.content.strip()]
         self.assertGreater(len(texts), 0, "Should have text content to embed from pdf file")
         
-        embeddings = await self._embedding_model.embed_documents(texts)
+        embeddings = None
+        async with timed("embed-doc"):
+            embeddings = await self._embedding_model.embed_documents(texts)
 
         uuid_str = str(uuid.uuid4())
         data = [{"id": uuid_str, "content": f"content-{uuid_str[:4]}", "contentVector": embedding} for embedding in embeddings]
@@ -76,11 +79,13 @@ class TestCosmosDB(unittest.IsolatedAsyncioTestCase):
             await self._db.index_vectors(data)
 
     async def test_search(self):
-        query = "Who is the founder of Arimac Digital?"
-        embedding = await self._embedding_model.embed_query(query)
+        embedding = None
+        async with timed("embed-query"):
+            embedding = await self._embedding_model.embed_query(QUERY)
 
         results = None
         async with timed("search"):
             results = await self._db.vector_search(embedding)
+
         for result in results:
             print("result --- \n", result)
