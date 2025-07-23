@@ -14,7 +14,8 @@ from embedding import BAAIEmbeddingModel
 
 load_dotenv()
 
-JSON_DOC = "sample-embeddings.json"
+# JSON_DOC = "small-sample-text.json"
+JSON_DOC = "sample-text.json"
 QUERY = "Azure service that enables you to run code on-demand"
 
 
@@ -39,7 +40,7 @@ async def timed(operation: str):
     start = time.perf_counter()
     yield
     duration = time.perf_counter() - start
-    await write_to_csv([operation, round(duration, 4)])
+    await write_to_csv([operation, round(duration, 6)])
 
 
 class TestCosmosDB(unittest.IsolatedAsyncioTestCase):
