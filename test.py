@@ -14,8 +14,8 @@ from embedding import BAAIEmbeddingModel
 
 load_dotenv()
 
-# JSON_DOC = "small-sample-text.json"
-JSON_DOC = "sample-text.json"
+JSON_DOC = "small-sample-text.json"
+# JSON_DOC = "sample-text.json"
 QUERY = "Azure service that enables you to run code on-demand"
 
 
