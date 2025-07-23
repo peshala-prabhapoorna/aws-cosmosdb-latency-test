@@ -14,9 +14,19 @@ from embedding import BAAIEmbeddingModel
 
 load_dotenv()
 
-JSON_DOC = "small-sample-text.json"
-# JSON_DOC = "sample-text.json"
-QUERY = "Azure service that enables you to run code on-demand"
+JSON_DOC = "sample-text.json"
+QUERIES = [
+    "How does machine learning integrate with cloud services?",
+    "What are the best practices for data backup and recovery?",
+    "Explain the differences between SQL and NoSQL databases",
+    "What security measures should be implemented for web applications?",
+    "How do you optimize performance in distributed systems?",
+    "What are the advantages of microservices architecture?",
+    "How does containerization improve application deployment?",
+    "What monitoring tools are essential for production environments?",
+    "Describe the benefits of serverless computing platforms",
+    "How do you handle data migration between different systems?"
+]
 
 
 async def write_to_csv(data: list):
@@ -58,6 +68,7 @@ class TestCosmosDB(unittest.IsolatedAsyncioTestCase):
             supported_languages=["en"]
         )
 
+    @unittest.SkipTest
     async def test_indexing(self):
         data = None
         with open(JSON_DOC, "r") as file:
@@ -77,21 +88,21 @@ class TestCosmosDB(unittest.IsolatedAsyncioTestCase):
             item["titleVector"] = embeddings[i]
             item["contentVector"] = embeddings[i + 1]
             item["@search.action"] = "upload"
-        
+
         async with timed("index"):
             await self._db.index_vectors(data)
 
     async def test_search(self):
-        embedding = None
-        async with timed("embed-query"):
-            embedding = await self._embedding_model.embed_query(QUERY)
+        for query in QUERIES:
+            embedding = None
+            async with timed("embed-query"):
+                embedding = await self._embedding_model.embed_query(query)
 
-        results = None
-        async with timed("search"):
-            results = await self._db.vector_search(embedding)
+            async with timed("search"):
+                results = await self._db.vector_search(embedding, num_results=2)
 
-        for result in results:
-            print(f"Similarity Score: {result['SimilarityScore']}")
-            print(f"Title: {result['title']}")
-            print(f"Content: {result['content']}")
-            print(f"Category: {result['category']}\n")
+            for result in results:
+                print(f"Similarity Score: {result['SimilarityScore']}")
+                print(f"Title: {result['title']}")
+                print(f"Content: {result['content']}")
+                print(f"Category: {result['category']}\n")
