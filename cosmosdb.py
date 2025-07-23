@@ -3,6 +3,12 @@ from azure.cosmos import CosmosClient, PartitionKey, exceptions
 vector_embedding_policy = {
     "vectorEmbeddings": [
         {
+            "path":"/titleVector",
+            "dataType":"float32",
+            "distanceFunction":"cosine",
+            "dimensions":1024
+        },
+        {
             "path":"/contentVector",
             "dataType":"float32",
             "distanceFunction":"cosine",
@@ -22,15 +28,22 @@ indexing_policy = {
             "path": "/\"_etag\"/?"
         },
         {
+            "path": "/titleVector/*"
+        },
+        {
             "path": "/contentVector/*"
         }
     ],
     "vectorIndexes": [
+        {"path": "/titleVector",
+         "type": "quantizedFlat"
+        },
         {"path": "/contentVector",
          "type": "quantizedFlat"
         }
     ]
 }
+
 
 class CosmosDB:
     def __init__(self, endpoint: str, key: str, database: str, container: str) -> None:
@@ -57,12 +70,13 @@ class CosmosDB:
         for item in data:
             self._container.upsert_item(item)
 
-    async def vector_search(self, embedding, num_results=2):
+    async def vector_search(self, embedding, num_results=1):
         results = self._container.query_items(
-                query='SELECT TOP @num_results c.content, VectorDistance(c.contentVector,@embedding) AS SimilarityScore  FROM c ORDER BY VectorDistance(c.contentVector,@embedding)',
-                parameters=[
-                    {"name": "@embedding", "value": embedding}, 
-                    {"name": "@num_results", "value": num_results} 
-                ],
-                enable_cross_partition_query=True)
+            query='SELECT TOP @num_results c.content, c.title, c.category, VectorDistance(c.contentVector,@embedding) AS SimilarityScore  FROM c ORDER BY VectorDistance(c.contentVector,@embedding)',
+            parameters=[
+                {"name": "@embedding", "value": embedding}, 
+                {"name": "@num_results", "value": num_results} 
+            ],
+            enable_cross_partition_query=True
+        )
         return results

@@ -1,7 +1,7 @@
 import contextlib
 import csv
 from datetime import datetime
-from pathlib import Path
+import json
 import time
 import os
 import unittest
@@ -11,12 +11,11 @@ from dotenv import load_dotenv
 
 from cosmosdb import CosmosDB
 from embedding import BAAIEmbeddingModel
-from pdf import DocumentLoaderPDF 
 
 load_dotenv()
 
-PDF_DOC = "arimac-rag-doc.pdf"
-QUERY = "Who is the founder of Arimac Digital?"
+JSON_DOC = "sample-embeddings.json"
+QUERY = "Azure service that enables you to run code on-demand"
 
 
 async def write_to_csv(data: list):
@@ -48,8 +47,8 @@ class TestCosmosDB(unittest.IsolatedAsyncioTestCase):
         self._db = CosmosDB(
             endpoint=os.environ.get("ENDPOINT"),
             key=os.environ.get("KEY"),
-            database="test-db",
-            container="test-container"
+            database="test-json-db",
+            container="test-json-container"
         )
         self._embedding_model = BAAIEmbeddingModel(
             dimension_count=1024,
@@ -59,22 +58,25 @@ class TestCosmosDB(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_indexing(self):
-        pdf_loader = DocumentLoaderPDF(Path(PDF_DOC))
-        await pdf_loader.initialize()
-        pages = list(pdf_loader.get_pages_itr())
-        self.assertGreater(len(pages), 0, "pdf document should have at least one page")
-        await pdf_loader.deinitialize()
+        data = None
+        with open(JSON_DOC, "r") as file:
+            data = json.load(file)
 
-        texts = [page.content for page in pages if page.content.strip()]
-        self.assertGreater(len(texts), 0, "Should have text content to embed from pdf file")
-        
+        text = []
+        for item in data:
+            text.append(item["title"])
+            text.append(item["content"])
+
         embeddings = None
-        async with timed("embed-doc"):
-            embeddings = await self._embedding_model.embed_documents(texts)
+        async with timed("embed-docs"):
+            embeddings = await self._embedding_model.embed_documents(text)
 
-        uuid_str = str(uuid.uuid4())
-        data = [{"id": uuid_str, "content": f"content-{uuid_str[:4]}", "contentVector": embedding} for embedding in embeddings]
-
+        for i, item in enumerate(data):
+            item["id"] = str(uuid.uuid4())
+            item["titleVector"] = embeddings[i]
+            item["contentVector"] = embeddings[i + 1]
+            item["@search.action"] = "upload"
+        
         async with timed("index"):
             await self._db.index_vectors(data)
 
@@ -88,4 +90,7 @@ class TestCosmosDB(unittest.IsolatedAsyncioTestCase):
             results = await self._db.vector_search(embedding)
 
         for result in results:
-            print("result --- \n", result)
+            print(f"Similarity Score: {result['SimilarityScore']}")
+            print(f"Title: {result['title']}")
+            print(f"Content: {result['content']}")
+            print(f"Category: {result['category']}\n")
